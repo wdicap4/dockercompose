@@ -1,0 +1,175 @@
+services:
+  fast-legeury-logistics-ms-server-registry:
+    build: ./ms_colis_server_registry
+    container_name: fast-legeury-logistics-ms-server-registry
+    ports:
+      - '8761:8761'
+    expose:
+      - 8761
+    healthcheck:
+      test: ["CMD","curl","-f", "http://localhost:8761/actuator/health"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+  
+  fast-legeury-logistics-ms-gateway:
+    build: ./ms_colis_gateway
+    container_name: fast-legeury-logistics-ms-gateway
+    ports:
+      - "9999:8888"
+    expose:
+      - '9999'
+    environment:
+      - EUREKA_HOST=fast-legeury-logistics-ms-server-registry
+      - EUREKA_PORT=8761
+    depends_on:
+      fast-legeury-logistics-ms-server-registry:
+        condition: service_healthy
+  
+  fast-legeury-logistics-db-user:
+    image: mysql:latest
+    container_name: fast-legeury-logistics-db-user
+    ports:
+      - "3307:3306"
+    expose:
+      - 3307
+    volumes:
+      - mysql_data_user:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: admin
+      MYSQL_DATABASE: db_utilisateur_colis
+      MYSQL_USER: admin_user
+    
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u root --password=root
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      
+  fast-legeury-logistics-ms-utilisateur:
+    build: ./ms-utilisateur-suivi-colis
+    container_name: fast-legeury-logistics-ms-utilisateur
+    ports:
+      - "8885:8885"
+    expose:
+      - '8885'
+    environment:
+      - EUREKA_HOST=fast-legeury-logistics-ms-server-registry
+      - EUREKA_PORT=8761
+      - MYSQL_HOST=fast-legeury-logistics-db-user
+      - MYSQL_PORT=3306
+      - MYSQL_USERNAME=admin_user
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DATABASE=db_utilisateur_colis
+    depends_on:
+      fast-legeury-logistics-db-user:
+        condition: service_healthy
+      fast-legeury-logistics-ms-server-registry:
+        condition: service_healthy
+    
+  fast-legeury-logistics-db-commande:
+    image: mysql:latest
+    container_name: fast-legeury-logistics-db-commande
+    ports:
+      - "3308:3306"
+    expose:
+      - 3308
+    volumes:
+      - mysql_data_commande:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: admin
+      MYSQL_DATABASE: db_colis_commande
+      MYSQL_USER: admin_user
+    
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u root --password=root
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  fast-legeury-logistics-ms-commande:
+    build: ./commande
+    container_name: fast-legeury-logistics-ms-commande
+    ports:
+      - "8886:8880"
+    expose:
+      - '8886'
+    environment:
+      - EUREKA_HOST=fast-legeury-logistics-ms-server-registry
+      - EUREKA_PORT=8761
+      - MYSQL_HOST=fast-legeury-logistics-db-commande
+      - MYSQL_PORT=3306
+      - MYSQL_USERNAME=admin_user
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DATABASE=db_colis_commande
+    depends_on:
+      fast-legeury-logistics-db-commande:
+        condition: service_healthy
+      fast-legeury-logistics-ms-server-registry:
+        condition: service_healthy
+  
+  fast-legeury-logistics-db-trajet:
+    image: mysql:latest
+    container_name: fast-legeury-logistics-db-trajet
+    ports:
+      - "3309:3306"
+    expose:
+      - 3309
+    volumes:
+      - mysql_data_trajet:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: admin
+      MYSQL_DATABASE: db_colis_parcours
+      MYSQL_USER: admin_user
+    
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u root --password=root
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  fast-legeury-logistics-ms-trajet:
+    build: ./ms-colis
+    container_name: fast-legeury-logistics-ms-trajet
+    ports:
+      - "8887:8883"
+    expose:
+      - '8887'
+    environment:
+      - EUREKA_HOST=fast-legeury-logistics-ms-server-registry
+      - EUREKA_PORT=8761
+      - MYSQL_HOST=fast-legeury-logistics-db-trajet
+      - MYSQL_PORT=3306
+      - MYSQL_USERNAME=admin_user
+      - MYSQL_PASSWORD=admin
+      - MYSQL_DATABASE=db_colis_parcours
+    depends_on:
+      fast-legeury-logistics-db-trajet:
+        condition: service_healthy
+      fast-legeury-logistics-ms-server-registry:
+        condition: service_healthy
+
+
+volumes:
+  mysql_data_user:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/wilfried/Documents/projets/db_colis/utilisateur
+  mysql_data_commande:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/wilfried/Documents/projets/db_colis/commande
+  mysql_data_trajet:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/wilfried/Documents/projets/db_colis/trajet
